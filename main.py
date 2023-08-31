@@ -39,7 +39,15 @@ async def process_picture(message: types.Message, state: FSMContext):
     pictures = current_data.get("pictures", [])
     pictures.append(message.photo[-1].file_id)
     await state.update_data(pictures=pictures)
-    await message.answer("Если есть ещё картинки, пришлите. Иначе напишите /next.")
+
+    # Ждем небольшое время перед отправкой сообщения
+    await asyncio.sleep(0.5)  # Задержка в секундах
+
+    # Проверяем, не было ли новых фотографий во время задержки
+    updated_data = await state.get_data()
+    updated_pictures = updated_data.get("pictures", [])
+    if pictures == updated_pictures:
+        await message.answer("Если есть ещё картинки, пришлите. Иначе напишите /next.")
 
 
 @dp.message_handler(state=Form.picture, commands='next')
@@ -54,7 +62,15 @@ async def process_video(message: types.Message, state: FSMContext):
     videos = current_data.get("videos", [])
     videos.append(message.video.file_id)
     await state.update_data(videos=videos)
-    await message.answer("Если есть ещё видео, пришлите. Иначе напишите /next.")
+
+    # Ждем небольшое время перед отправкой сообщения
+    await asyncio.sleep(0.5)  # Задержка в секундах
+
+    # Проверяем, не было ли новых фотографий во время задержки
+    updated_data = await state.get_data()
+    updated_videos = updated_data.get("pictures", [])
+    if videos == updated_videos:
+        await message.answer("Если есть ещё картинки, пришлите. Иначе напишите /next.")
 
 
 @dp.message_handler(state=Form.video, commands='next')
