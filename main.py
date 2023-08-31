@@ -16,6 +16,7 @@ dp = Dispatcher(bot, storage=storage)
 
 
 class Form(StatesGroup):
+    author = State()  # добавил новое состояние
     name = State()
     picture = State()
     video = State()
@@ -23,7 +24,14 @@ class Form(StatesGroup):
 
 @dp.message_handler(commands='start')
 async def cmd_start(message: types.Message):
-    await Form.name.set()
+    await Form.author.set()
+    await message.answer("Напишите автора:")
+
+
+@dp.message_handler(state=Form.author, content_types=types.ContentTypes.TEXT)
+async def process_author(message: types.Message, state: FSMContext):  # добавил state
+    await state.update_data(author=message.text)  # сохраняю автора в состояние
+    await Form.next()
     await message.answer("Пришлите текст:")
 
 
@@ -31,7 +39,13 @@ async def cmd_start(message: types.Message):
 async def process_name(message: types.Message, state: FSMContext):
     await state.update_data(name=message.text)
     await Form.next()
-    await message.answer("Пришлите картинку:")
+    await message.answer("Пришлите картинку (не файл):")
+
+
+async def send_next_button(message: types.Message):
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton("Next", callback_data="next"))
+    await message.answer("Если есть ещё, пришлите. Иначе нажмите Next.", reply_markup=markup)
 
 
 @dp.message_handler(state=Form.picture, content_types=types.ContentTypes.PHOTO)
@@ -41,20 +55,19 @@ async def process_picture(message: types.Message, state: FSMContext):
     pictures.append(message.photo[-1].file_id)
     await state.update_data(pictures=pictures)
 
-    # Ждем небольшое время перед отправкой сообщения
-    await asyncio.sleep(0.5)  # Задержка в секундах
+    await asyncio.sleep(0.5)
 
-    # Проверяем, не было ли новых фотографий во время задержки
     updated_data = await state.get_data()
     updated_pictures = updated_data.get("pictures", [])
     if pictures == updated_pictures:
-        await message.answer("Если есть ещё картинки, пришлите. Иначе напишите /next.")
+        await send_next_button(message)
 
 
-@dp.message_handler(state=Form.picture, commands='next')
-async def next_picture(message: types.Message, state: FSMContext):
+@dp.callback_query_handler(lambda c: c.data == 'next', state=Form.picture)
+async def process_callback_next_picture(callback_query: types.CallbackQuery, state: FSMContext):
+    await bot.answer_callback_query(callback_query.id)
     await Form.next()
-    await message.answer("Пришлите видео:")
+    await bot.send_message(callback_query.from_user.id, "Пришлите видео (не файл):")
 
 
 @dp.message_handler(state=Form.video, content_types=types.ContentTypes.VIDEO)
@@ -64,21 +77,21 @@ async def process_video(message: types.Message, state: FSMContext):
     videos.append(message.video.file_id)
     await state.update_data(videos=videos)
 
-    # Ждем небольшое время перед отправкой сообщения
-    await asyncio.sleep(0.5)  # Задержка в секундах
+    await asyncio.sleep(0.5)
 
-    # Проверяем, не было ли новых фотографий во время задержки
     updated_data = await state.get_data()
-    updated_videos = updated_data.get("pictures", [])
+    updated_videos = updated_data.get("videos", [])
     if videos == updated_videos:
-        await message.answer("Если есть ещё картинки, пришлите. Иначе напишите /next.")
+        await send_next_button(message)
 
 
-@dp.message_handler(state=Form.video, commands='next')
-async def next_video(message: types.Message, state: FSMContext):
+@dp.callback_query_handler(lambda c: c.data == 'next', state=Form.video)
+async def process_callback_next_video(callback_query: types.CallbackQuery, state: FSMContext):
+    await bot.answer_callback_query(callback_query.id)
     data = await state.get_data()
 
-    await bot.send_message(TARGET_USER_ID, f"From user {message.from_user.first_name}:")
+    await bot.send_message(TARGET_USER_ID, f"From user {callback_query.from_user.first_name}:")
+    await bot.send_message(TARGET_USER_ID, f"Author: {data.get('author')}")
     await bot.send_message(TARGET_USER_ID, f"Text: {data.get('name')}")
 
     pictures = data.get("pictures", [])
@@ -91,6 +104,7 @@ async def next_video(message: types.Message, state: FSMContext):
         await bot.send_video(TARGET_USER_ID, video)
 
     await state.finish()
+
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)
