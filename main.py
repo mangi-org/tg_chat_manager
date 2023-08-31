@@ -90,6 +90,7 @@ async def process_callback_next_video(callback_query: types.CallbackQuery, state
     await bot.answer_callback_query(callback_query.id)
     data = await state.get_data()
 
+    await bot.send_message(TARGET_USER_ID, f"Author: {data.get('author')}")
     await bot.send_message(TARGET_USER_ID, f"From user {callback_query.from_user.first_name}:")
     await bot.send_message(TARGET_USER_ID, f"Author: {data.get('author')}")
     await bot.send_message(TARGET_USER_ID, f"Text: {data.get('name')}")
